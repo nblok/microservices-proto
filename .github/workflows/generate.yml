@@ -1,0 +1,63 @@
+name: Generate Go code
+
+# Regenerates golang/<service> whenever a .proto changes on main and commits
+# the result. Releasing a version is a separate, deliberate step: run this
+# workflow manually with a service + version to tag golang/<service>/<version>.
+on:
+  push:
+    branches: [main]
+    paths: ["**.proto"]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to tag (e.g. order)"
+        required: false
+      version:
+        description: "Version to tag (e.g. v0.1.0)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: golang/order/go.mod
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Generate
+        run: ./generate.sh
+
+      - name: Commit generated code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add golang
+          if git diff --cached --quiet; then
+            echo "No changes to generated code."
+          else
+            git commit -m "Regenerate Go code"
+            git push
+          fi
+
+      - name: Tag release
+        if: github.event_name == 'workflow_dispatch' && inputs.service != '' && inputs.version != ''
+        run: |
+          tag="golang/${{ inputs.service }}/${{ inputs.version }}"
+          git tag "$tag"
+          git push origin "$tag"
