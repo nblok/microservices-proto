@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package payment;
+
+option go_package = "github.com/nblok/microservices-proto/golang/payment";
+
+message CreatePaymentRequest {
+  string customer_id = 1;
+  string order_id = 2;
+  float total_price = 3;
+}
+
+message CreatePaymentResponse {
+  string payment_id = 1;
+  string bill_id = 2;
+}
+
+service Payment {
+  rpc Create(CreatePaymentRequest) returns (CreatePaymentResponse){}
+}
